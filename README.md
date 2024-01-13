@@ -2,6 +2,18 @@
 
 This is a simple example of how to use healthchecks in a Dockerfile using distroless images.
 
+```bash
+./check --help
+
+Usage:
+   check [url]
+
+   Example:
+   check tcp://example.com:2222
+   check http://example.com:8080
+   check https://example.com:8443
+```
+
 cat Dockerfile
 ```yaml
 # Start by building the application.
