@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
-	"strings"
 )
 
 // Version is the application version, it can be set at compile time
@@ -28,19 +28,23 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		displayHelp()
 		os.Exit(1)
 	}
 
-	checkType := os.Args[1]
-	target := os.Args[2]
+	target := os.Args[1]
+	u, err := url.Parse(target)
+	if err != nil {
+		fmt.Println("Error: Invalid target URL")
+		os.Exit(1)
+	}
 
-	switch strings.ToLower(checkType) {
+	switch u.Scheme {
 	case "http":
 		resp, err := http.Get(target)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			fmt.Println("Error: Failed to connect to the target")
+			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
 	case "https":
@@ -51,20 +55,13 @@ func main() {
 		}
 		resp, err := client.Get(target)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			fmt.Println("Error: Failed to connect to the target")
+			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
 	case "tcp":
-		conn, err := net.Dial("tcp", target)
+		conn, err := net.Dial("tcp", u.Host)
 		if err != nil {
-			fmt.Println("Error: Failed to connect to the target")
-			os.Exit(1)
-		}
-		conn.Close()
-	case "udp":
-		conn, err := net.Dial("udp", target)
-		if err != nil {
-			fmt.Println("Error: Failed to connect to the target")
+			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
 		conn.Close()
@@ -77,13 +74,12 @@ func main() {
 
 func displayHelp() {
 	fmt.Println(`Usage:
-   check command [arguments...]
+   check [url]
 
    Example:
-   check tcp example.com:2222
-   check udp example.com:5353
-   check http http://example.com:8080
-   check https https://example.com:8443
+   check tcp://example.com:2222
+   check http://example.com:8080
+   check https://example.com:8443
 
 Version:
    ` + Version + `
@@ -92,13 +88,6 @@ Description:
    check is a high performance check tool whose command can be started
    by using this command. If none of the *http*, *https*, *tcp*, or *udp* commands
    are specified, the default action of the **check** command is to display this help.
-
-Commands:
-   http    check http target
-   https   check https target
-   tcp     check tcp target
-   udp     check udp target
-   help    Shows a list of commands or help for one command
 
 Global Options:
    --help         show help
