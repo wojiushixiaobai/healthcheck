@@ -29,10 +29,11 @@ builds:
     goarch:
       - amd64
       - arm64
+      - mips64le
       - ppc64le
       - s390x
       - riscv64
-      - loong64
+      # - loong64
 
 archives:
   - format: tar.gz
