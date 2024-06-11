@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,65 +10,82 @@ import (
 )
 
 // Version is the application version, it can be set at compile time
-var Version string
+var Version = "dev"
 
 func main() {
-	help := flag.Bool("help", false, "Display Help")
-	displayVersion := flag.Bool("version", false, "Display Version")
-	flag.Parse()
-
-	if *help {
+	help, displayVersion, target := parseArgs(os.Args)
+	if help {
 		displayHelp()
 		os.Exit(0)
 	}
 
-	if *displayVersion {
+	if displayVersion {
 		fmt.Println("Version:", Version)
 		os.Exit(0)
 	}
 
-	if len(os.Args) < 2 {
-		displayHelp()
+	err := checkTarget(target)
+	if err != nil {
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
+}
 
-	target := os.Args[1]
+func parseArgs(args []string) (bool, bool, string) {
+	help := false
+	version := false
+	var target string
+
+	for _, arg := range args[1:] {
+		switch arg {
+		case "-h", "--help":
+			help = true
+		case "-v", "--version":
+			version = true
+		default:
+			if target != "" {
+				fmt.Println("Multiple targets specified")
+				os.Exit(1)
+			}
+			target = arg
+		}
+	}
+
+	return help, version, target
+}
+
+func checkTarget(target string) error {
 	u, err := url.Parse(target)
 	if err != nil {
-		fmt.Println("Error: Invalid target URL")
-		os.Exit(1)
+		return fmt.Errorf("%v", err)
 	}
 
 	switch u.Scheme {
-	case "http":
-		resp, err := http.Get(target)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			fmt.Println("Error:", err)
-			os.Exit(1)
-		}
-	case "https":
+	case "http", "https":
 		client := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
 		resp, err := client.Get(target)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			fmt.Println("Error:", err)
-			os.Exit(1)
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("get %s %d", target, resp.StatusCode)
 		}
 	case "tcp":
 		conn, err := net.Dial("tcp", u.Host)
 		if err != nil {
-			fmt.Println("Error:", err)
-			os.Exit(1)
+			return fmt.Errorf("%v", err)
 		}
 		conn.Close()
 	default:
-		fmt.Println("Error: Invalid check type")
-		displayHelp()
-		os.Exit(1)
+		return fmt.Errorf("invalid check type")
 	}
+
+	return nil
 }
 
 func displayHelp() {
